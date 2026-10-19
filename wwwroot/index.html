@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StockFlow API - Warehouse Management System</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Alpine.js CDN -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 font-sans antialiased min-h-screen" x-data="stockFlowApp()" x-init="init()">
+
+    <!-- Top Navigation Header -->
+    <header class="bg-slate-800/80 backdrop-blur-md border-b border-slate-700 sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <div class="bg-indigo-600 p-2.5 rounded-xl shadow-lg shadow-indigo-500/30 flex items-center justify-center">
+                    <i class="fa-solid fa-boxes-stacked text-white text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight text-white">StockFlow <span class="text-indigo-400">API</span></h1>
+                    <p class="text-xs text-slate-400">Warehouse & Inventory Management</p>
+                </div>
+            </div>
+            
+            <!-- Management & Action Buttons -->
+            <div class="flex items-center space-x-3">
+                <button @click="exportExcel()" class="bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white px-4 py-2.5 rounded-xl shadow-lg shadow-emerald-600/20 text-sm font-medium transition flex items-center gap-2">
+                    <i class="fa-solid fa-file-excel"></i>
+                    <span>Export Excel</span>
+                </button>
+                <button @click="openStockHistory()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 px-4 py-2.5 rounded-xl text-sm font-medium transition flex items-center gap-2">
+                    <i class="fa-solid fa-clock-rotate-left text-slate-400"></i>
+                    <span>Stock History</span>
+                </button>
+                <button @click="openCompanyManager()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 px-4 py-2.5 rounded-xl text-sm font-medium transition flex items-center gap-2">
+                    <i class="fa-solid fa-building text-slate-400"></i>
+                    <span>Companies</span>
+                </button>
+                <button @click="openProductTypeManager()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 px-4 py-2.5 rounded-xl text-sm font-medium transition flex items-center gap-2">
+                    <i class="fa-solid fa-layer-group text-slate-400"></i>
+                    <span>Product Types</span>
+                </button>
+                <button @click="openModal()" class="bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white px-5 py-2.5 rounded-xl shadow-lg shadow-indigo-600/30 font-medium transition-all duration-200 flex items-center gap-2">
+                    <i class="fa-solid fa-plus text-sm"></i>
+                    <span>Add New Product</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-7xl mx-auto px-6 py-8">
+
+        <!-- Search & Filters Card -->
+        <div class="bg-slate-800 border border-slate-700 p-5 rounded-2xl shadow-xl mb-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                
+                <!-- Search Input -->
+                <div class="relative">
+                    <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                    <input type="text" 
+                           x-model.debounce.300ms="search" 
+                           @input="page = 1; loadProducts()" 
+                           @keydown.enter.prevent="page = 1; loadProducts()" 
+                           placeholder="Search products..." 
+                           class="w-full bg-slate-900 border border-slate-700 text-slate-100 placeholder-slate-500 rounded-xl pl-11 pr-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm transition">
+                </div>
+
+                <!-- Company Filter -->
+                <div class="relative" x-data="{ open: false, filterText: '' }">
+                    <div @click="open = !open" class="w-full bg-slate-900 border border-slate-700 text-slate-100 rounded-xl pl-11 pr-10 py-2.5 text-sm cursor-pointer flex items-center justify-between select-none">
+                        <div class="flex items-center gap-2 truncate">
+                            <i class="fa-solid fa-building text-slate-400"></i>
+                            <span x-text="selectedCompanyId ? (companies.find(c => c.id == selectedCompanyId)?.name || 'All Companies') : 'All Companies'"></span>
+                        </div>
+                        <i class="fa-solid fa-chevron-down text-xs text-slate-400 transition-transform" :class="open ? 'rotate-180' : ''"></i>
+                    </div>
+
+                    <div x-show="open" @click.away="open = false" class="absolute left-0 right-0 mt-2 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden" style="display: none;" x-transition>
+                        <div class="p-2.5 border-b border-slate-700/80 bg-slate-800/50">
+                            <input type="text" x-model="filterText" placeholder="Type to search company..." class="w-full bg-slate-900 border border-slate-700 text-white px-3 py-1.5 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                        </div>
+                        <div class="max-h-56 overflow-y-auto p-1 space-y-0.5">
+                            <div @click="selectedCompanyId = ''; open = false; filterText = ''; page = 1; loadProducts()" 
+                                 class="px-3 py-2 text-xs text-slate-300 hover:bg-indigo-600/30 hover:text-indigo-300 rounded-lg cursor-pointer transition">
+                                All Companies
+                            </div>
+                            <template x-for="comp in companies.filter(c => c.name.toLowerCase().includes(filterText.toLowerCase()))" :key="comp.id">
+                                <div @click="selectedCompanyId = comp.id; open = false; filterText = ''; page = 1; loadProducts()" 
+                                     class="px-3 py-2 text-xs text-slate-300 hover:bg-indigo-600/30 hover:text-indigo-300 rounded-lg cursor-pointer transition truncate" 
+                                     x-text="comp.name">
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Product Type Filter -->
+                <div class="relative" x-data="{ open: false, filterText: '' }">
+                    <div @click="open = !open" class="w-full bg-slate-900 border border-slate-700 text-slate-100 rounded-xl pl-11 pr-10 py-2.5 text-sm cursor-pointer flex items-center justify-between select-none">
+                        <div class="flex items-center gap-2 truncate">
+                            <i class="fa-solid fa-layer-group text-slate-400"></i>
+                            <span x-text="selectedProductTypeId ? (productTypes.find(t => t.id == selectedProductTypeId)?.typeName || productTypes.find(t => t.id == selectedProductTypeId)?.name || 'All Product Types') : 'All Product Types'"></span>
+                        </div>
+                        <i class="fa-solid fa-chevron-down text-xs text-slate-400 transition-transform" :class="open ? 'rotate-180' : ''"></i>
+                    </div>
+
+                    <div x-show="open" @click.away="open = false" class="absolute left-0 right-0 mt-2 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden" style="display: none;" x-transition>
+                        <div class="p-2.5 border-b border-slate-700/80 bg-slate-800/50">
+                            <input type="text" x-model="filterText" placeholder="Type to search type..." class="w-full bg-slate-900 border border-slate-700 text-white px-3 py-1.5 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                        </div>
+                        <div class="max-h-56 overflow-y-auto p-1 space-y-0.5">
+                            <div @click="selectedProductTypeId = ''; open = false; filterText = ''; page = 1; loadProducts()" 
+                                 class="px-3 py-2 text-xs text-slate-300 hover:bg-indigo-600/30 hover:text-indigo-300 rounded-lg cursor-pointer transition">
+                                All Product Types
+                            </div>
+                            <template x-for="type in productTypes.filter(t => (t.typeName || t.name).toLowerCase().includes(filterText.toLowerCase()))" :key="type.id">
+                                <div @click="selectedProductTypeId = type.id; open = false; filterText = ''; page = 1; loadProducts()" 
+                                     class="px-3 py-2 text-xs text-slate-300 hover:bg-indigo-600/30 hover:text-indigo-300 rounded-lg cursor-pointer transition truncate" 
+                                     x-text="type.typeName || type.name">
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Products Table Card -->
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl shadow-xl overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-sm">
+                    <thead>
+                        <tr class="bg-slate-900/60 text-slate-400 uppercase text-xs tracking-wider border-b border-slate-700 select-none">
+                            <th @click="sortByColumn('name')" class="py-4 px-6 font-semibold cursor-pointer hover:text-indigo-400 transition">
+                                Product Name
+                                <i class="fa-solid" :class="sortBy === 'name' ? (sortOrder === 'asc' ? 'fa-sort-up text-indigo-400' : 'fa-sort-down text-indigo-400') : 'fa-sort opacity-40'"></i>
+                            </th>
+                            <th class="py-4 px-6 font-semibold">Company</th>
+                            <th class="py-4 px-6 font-semibold">Category</th>
+                            <th @click="sortByColumn('stock')" class="py-4 px-6 font-semibold text-center cursor-pointer hover:text-indigo-400 transition">
+                                Stock Quantity
+                                <i class="fa-solid" :class="sortBy === 'stock' ? (sortOrder === 'asc' ? 'fa-sort-up text-indigo-400' : 'fa-sort-down text-indigo-400') : 'fa-sort opacity-40'"></i>
+                            </th>
+                            <th @click="sortByColumn('price')" class="py-4 px-6 font-semibold text-right cursor-pointer hover:text-indigo-400 transition">
+                                Price
+                                <i class="fa-solid" :class="sortBy === 'price' ? (sortOrder === 'asc' ? 'fa-sort-up text-indigo-400' : 'fa-sort-down text-indigo-400') : 'fa-sort opacity-40'"></i>
+                            </th>
+                            <th class="py-4 px-6 font-semibold text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-700/50">
+                        <template x-for="prod in products" :key="prod.id">
+                            <tr class="hover:bg-slate-700/30 transition-colors">
+                                <td class="py-4 px-6 font-semibold text-white" x-text="prod.productName || prod.name"></td>
+                                <td class="py-4 px-6 text-slate-300">
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 text-xs">
+                                        <i class="fa-solid fa-building text-slate-400 text-[10px]"></i>
+                                        <span x-text="prod.companyName || (prod.company ? prod.company.name : 'N/A')"></span>
+                                    </span>
+                                </td>
+                                <td class="py-4 px-6 text-slate-300">
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-xs">
+                                        <span x-text="prod.productTypeName || (prod.productType ? prod.productType.name : 'N/A')"></span>
+                                    </span>
+                                </td>
+                                <td class="py-4 px-6 text-center">
+                                    <span :class="(prod.stockQuantity || prod.quantity) < 10 ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'" class="px-3 py-1 rounded-full border text-xs font-medium inline-block min-w-[50px]">
+                                        <span x-text="prod.stockQuantity ?? prod.quantity"></span>
+                                    </span>
+                                </td>
+                                <td class="py-4 px-6 text-right font-medium text-emerald-400" x-text="'$' + Number(prod.price).toFixed(2)"></td>
+                                <td class="py-4 px-6 text-right space-x-2">
+                                    <button @click="editProduct(prod)" class="text-indigo-400 hover:text-indigo-300 transition text-xs font-medium px-2.5 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
+                                        <i class="fa-solid fa-pen-to-square"></i> Edit
+                                    </button>
+                                    <button @click="deleteProduct(prod.id)" class="text-rose-400 hover:text-rose-300 transition text-xs font-medium px-2.5 py-1 rounded-lg bg-rose-500/10 border border-rose-500/20">
+                                        <i class="fa-solid fa-trash"></i> Delete
+                                    </button>
+                                </td>
+                            </tr>
+                        </template>
+
+                        <template x-if="products.length === 0">
+                            <tr>
+                                <td colspan="6" class="py-12 text-center text-slate-500">
+                                    <i class="fa-solid fa-box-open text-4xl mb-3 block text-slate-600"></i>
+                                    <p class="text-base font-medium">No products found</p>
+                                    <p class="text-xs text-slate-600 mt-1">Try adjusting your filters or create a new product.</p>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination Bar -->
+            <div class="bg-slate-900/60 border-t border-slate-700 px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-slate-400">
+                <div>
+                    Showing <span class="font-medium text-white" x-text="totalCount > 0 ? ((page - 1) * pageSize + 1) : 0"></span> 
+                    to <span class="font-medium text-white" x-text="Math.min(page * pageSize, totalCount)"></span> 
+                    of <span class="font-medium text-white" x-text="totalCount"></span> entries
+                </div>
+
+                <div class="flex items-center space-x-2">
+                    <button @click="prevPage()" :disabled="page <= 1" class="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-700 transition">
+                        <i class="fa-solid fa-chevron-left mr-1"></i> Prev
+                    </button>
+                    <span class="px-3 py-1.5 font-medium text-white bg-slate-800 border border-slate-700 rounded-lg">
+                        Page <span x-text="page"></span> / <span x-text="totalPages || 1"></span>
+                    </span>
+                    <button @click="nextPage()" :disabled="page >= totalPages" class="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-700 transition">
+                        Next <i class="fa-solid fa-chevron-right ml-1"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Add/Edit Product Modal -->
+    <div x-show="showModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50" style="display: none;" x-transition>
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-md w-full p-6 shadow-2xl relative" @click.away="showModal = false">
+            <div class="flex justify-between items-center mb-6 border-b border-slate-700 pb-4">
+                <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-circle-plus text-indigo-500"></i>
+                    <span x-text="form.id ? 'Edit Product' : 'Add New Product'"></span>
+                </h2>
+                <button @click="showModal = false" class="text-slate-400 hover:text-white transition">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <form @submit.prevent="saveProduct()" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Product Name</label>
+                    <input type="text" x-model="form.name" required placeholder="e.g. Wireless Mouse" class="w-full bg-slate-900 border border-slate-700 text-white rounded-xl p-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
+                </div>
+
+                <!-- Company Autocomplete Selector -->
+                <div class="relative" x-data="{ open: false, filterText: '' }">
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="text-xs font-medium text-slate-300">Company</label>
+                        <button type="button" @click="quickAddCompany()" class="text-xs text-indigo-400 hover:text-indigo-300 font-semibold flex items-center gap-1">
+                            <i class="fa-solid fa-plus text-[10px]"></i> Add New
+                        </button>
+                    </div>
+                    
+                    <div @click="open = !open" class="w-full bg-slate-900 border border-slate-700 text-white rounded-xl p-2.5 text-sm cursor-pointer flex items-center justify-between select-none">
+                        <span x-text="form.companyId ? (companies.find(c => c.id == form.companyId)?.name || 'Select Company') : 'Select Company'"></span>
+                        <i class="fa-solid fa-chevron-down text-xs text-slate-400 transition-transform" :class="open ? 'rotate-180' : ''"></i>
+                    </div>
+
+                    <div x-show="open" @click.away="open = false" class="absolute left-0 right-0 mt-2 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden" style="display: none;" x-transition>
+                        <div class="p-2 border-b border-slate-700 bg-slate-800/50">
+                            <input type="text" x-model="filterText" placeholder="Search company..." class="w-full bg-slate-900 border border-slate-700 text-white px-3 py-1 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                        </div>
+                        <div class="max-h-48 overflow-y-auto p-1 space-y-0.5">
+                            <template x-for="comp in companies.filter(c => c.name.toLowerCase().includes(filterText.toLowerCase()))" :key="comp.id">
+                                <div @click="form.companyId = comp.id; open = false; filterText = ''" 
+                                     class="px-3 py-2 text-xs text-slate-300 hover:bg-indigo-600/30 hover:text-indigo-300 rounded-lg cursor-pointer transition truncate" 
+                                     x-text="comp.name">
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Product Type Autocomplete Selector -->
+                <div class="relative" x-data="{ open: false, filterText: '' }">
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="text-xs font-medium text-slate-300">Product Type</label>
+                        <button type="button" @click="quickAddProductType()" class="text-xs text-indigo-400 hover:text-indigo-300 font-semibold flex items-center gap-1">
+                            <i class="fa-solid fa-plus text-[10px]"></i> Add New
+                        </button>
+                    </div>
+
+                    <div @click="open = !open" class="w-full bg-slate-900 border border-slate-700 text-white rounded-xl p-2.5 text-sm cursor-pointer flex items-center justify-between select-none">
+                        <span x-text="form.productTypeId ? (productTypes.find(t => t.id == form.productTypeId)?.typeName || productTypes.find(t => t.id == form.productTypeId)?.name || 'Select Product Type') : 'Select Product Type'"></span>
+                        <i class="fa-solid fa-chevron-down text-xs text-slate-400 transition-transform" :class="open ? 'rotate-180' : ''"></i>
+                    </div>
+
+                    <div x-show="open" @click.away="open = false" class="absolute left-0 right-0 mt-2 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden" style="display: none;" x-transition>
+                        <div class="p-2 border-b border-slate-700 bg-slate-800/50">
+                            <input type="text" x-model="filterText" placeholder="Search type..." class="w-full bg-slate-900 border border-slate-700 text-white px-3 py-1 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                        </div>
+                        <div class="max-h-48 overflow-y-auto p-1 space-y-0.5">
+                            <template x-for="type in productTypes.filter(t => (t.typeName || t.name).toLowerCase().includes(filterText.toLowerCase()))" :key="type.id">
+                                <div @click="form.productTypeId = type.id; open = false; filterText = ''" 
+                                     class="px-3 py-2 text-xs text-slate-300 hover:bg-indigo-600/30 hover:text-indigo-300 rounded-lg cursor-pointer transition truncate" 
+                                     x-text="type.typeName || type.name">
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1">Quantity</label>
+                        <input type="number" x-model.number="form.stockQuantity" min="0" required class="w-full bg-slate-900 border border-slate-700 text-white rounded-xl p-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1">Price ($)</label>
+                        <input type="number" step="0.01" min="0" x-model.number="form.price" required class="w-full bg-slate-900 border border-slate-700 text-white rounded-xl p-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-3 pt-4 border-t border-slate-700">
+                    <button type="button" @click="showModal = false" class="px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm font-medium transition">Cancel</button>
+                    <button type="submit" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition shadow-lg shadow-indigo-600/30" x-text="form.id ? 'Update Product' : 'Save Product'"></button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Company Management Modal (With Search Engine) -->
+    <div x-show="showCompanyModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50" style="display: none;" x-transition>
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-md w-full p-6 shadow-2xl relative" @click.away="showCompanyModal = false">
+            <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-3">
+                <h3 class="text-base font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-building text-indigo-500"></i> Manage Companies
+                </h3>
+                <button @click="showCompanyModal = false" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <!-- Search Input for Companies -->
+            <div class="relative mb-3">
+                <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                <input type="text" x-model="searchCompanyText" placeholder="Search companies..." class="w-full bg-slate-900 border border-slate-700 text-white placeholder-slate-500 rounded-xl pl-9 pr-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500">
+            </div>
+
+            <div class="space-y-2 max-h-60 overflow-y-auto mb-4 pr-1">
+                <template x-for="comp in companies.filter(c => c.name.toLowerCase().includes(searchCompanyText.toLowerCase()))" :key="comp.id">
+                    <div class="flex justify-between items-center bg-slate-900 border border-slate-700/60 p-3 rounded-xl">
+                        <span class="text-sm font-medium text-white truncate max-w-[200px]" x-text="comp.name"></span>
+                        <div class="flex items-center space-x-2">
+                            <button @click="updateCompany(comp)" class="text-indigo-400 hover:text-indigo-300 text-xs px-2.5 py-1 bg-indigo-500/10 rounded-lg border border-indigo-500/20">Edit</button>
+                            <button @click="deleteCompany(comp.id)" class="text-rose-400 hover:text-rose-300 text-xs px-2.5 py-1 bg-rose-500/10 rounded-lg border border-rose-500/20">Delete</button>
+                        </div>
+                    </div>
+                </template>
+                <template x-if="companies.filter(c => c.name.toLowerCase().includes(searchCompanyText.toLowerCase())).length === 0">
+                    <div class="text-center py-6 text-slate-500 text-xs">
+                        No matching companies found.
+                    </div>
+                </template>
+            </div>
+            <button @click="showCompanyModal = false" class="w-full bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-xl text-sm transition">Close</button>
+        </div>
+    </div>
+
+    <!-- Product Type Management Modal (With Search Engine) -->
+    <div x-show="showProductTypeModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50" style="display: none;" x-transition>
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-md w-full p-6 shadow-2xl relative" @click.away="showProductTypeModal = false">
+            <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-3">
+                <h3 class="text-base font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-layer-group text-indigo-500"></i> Manage Product Types
+                </h3>
+                <button @click="showProductTypeModal = false" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <!-- Search Input for Product Types -->
+            <div class="relative mb-3">
+                <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                <input type="text" x-model="searchProductTypeText" placeholder="Search product types..." class="w-full bg-slate-900 border border-slate-700 text-white placeholder-slate-500 rounded-xl pl-9 pr-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500">
+            </div>
+
+            <div class="space-y-2 max-h-60 overflow-y-auto mb-4 pr-1">
+                <template x-for="type in productTypes.filter(t => (t.typeName || t.name).toLowerCase().includes(searchProductTypeText.toLowerCase()))" :key="type.id">
+                    <div class="flex justify-between items-center bg-slate-900 border border-slate-700/60 p-3 rounded-xl">
+                        <span class="text-sm font-medium text-white truncate max-w-[200px]" x-text="type.typeName || type.name"></span>
+                        <div class="flex items-center space-x-2">
+                            <button @click="updateProductType(type)" class="text-indigo-400 hover:text-indigo-300 text-xs px-2.5 py-1 bg-indigo-500/10 rounded-lg border border-indigo-500/20">Edit</button>
+                            <button @click="deleteProductType(type.id)" class="text-rose-400 hover:text-rose-300 text-xs px-2.5 py-1 bg-rose-500/10 rounded-lg border border-rose-500/20">Delete</button>
+                        </div>
+                    </div>
+                </template>
+                <template x-if="productTypes.filter(t => (t.typeName || t.name).toLowerCase().includes(searchProductTypeText.toLowerCase())).length === 0">
+                    <div class="text-center py-6 text-slate-500 text-xs">
+                        No matching product types found.
+                    </div>
+                </template>
+            </div>
+            <button @click="showProductTypeModal = false" class="w-full bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-xl text-sm transition">Close</button>
+        </div>
+    </div>
+
+    <!-- Stock History Modal -->
+    <div x-show="showStockHistoryModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50" style="display: none;" x-transition>
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-4xl w-full p-6 shadow-2xl relative" @click.away="showStockHistoryModal = false">
+            
+            <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-3">
+                <h3 class="text-base font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-clock-rotate-left text-indigo-500"></i> Stock Movement History (Audit Logs)
+                </h3>
+                <button @click="showStockHistoryModal = false" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+
+            <div class="flex flex-col sm:flex-row justify-between items-center bg-slate-900/60 p-3 rounded-xl border border-slate-700 mb-4 gap-3">
+                <div class="flex items-center gap-2 text-xs text-slate-300">
+                    <i class="fa-solid fa-calendar-days text-indigo-400"></i>
+                    <span>Clear logs older than:</span>
+                    <input type="date" lang="en-US" x-model="clearBeforeDate" class="bg-slate-900 border border-slate-700 text-white px-3 py-1.5 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                </div>
+                <button @click="clearOldTransactions()" class="bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 border border-rose-500/30 px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-trash-can"></i> Delete Older Logs
+                </button>
+            </div>
+            
+            <div class="overflow-y-auto mb-4 pr-1 max-h-80">
+                <table class="w-full text-left border-collapse text-xs">
+                    <thead>
+                        <tr class="bg-slate-900/60 text-slate-400 uppercase tracking-wider border-b border-slate-700 sticky top-0">
+                            <th class="py-3 px-4 font-semibold">Date</th>
+                            <th class="py-3 px-4 font-semibold">Product</th>
+                            <th class="py-3 px-4 font-semibold">Type</th>
+                            <th class="py-3 px-4 font-semibold text-center">Qty</th>
+                            <th class="py-3 px-4 font-semibold">Description</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-700/50">
+                        <template x-for="tx in stockTransactions" :key="tx.id">
+                            <tr class="hover:bg-slate-700/30 transition-colors">
+                                <td class="py-3 px-4 text-slate-400 whitespace-nowrap" x-text="new Date(tx.transactionDate).toLocaleString('en-US')"></td>
+                                <td class="py-3 px-4 font-medium text-white" x-text="tx.productName"></td>
+                                <td class="py-3 px-4">
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-semibold"
+                                          :class="tx.transactionType.includes('In') || tx.transactionType.includes('+') ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'"
+                                          x-text="tx.transactionType">
+                                    </span>
+                                </td>
+                                <td class="py-3 px-4 text-center font-bold" x-text="tx.quantity"></td>
+                                <td class="py-3 px-4 text-slate-300" x-text="tx.description"></td>
+                            </tr>
+                        </template>
+                        <template x-if="stockTransactions.length === 0">
+                            <tr>
+                                <td colspan="5" class="py-8 text-center text-slate-500">
+                                    No stock history found.
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="bg-slate-900/60 border border-slate-700 px-4 py-3 rounded-xl flex justify-between items-center text-xs text-slate-400 mb-4">
+                <div>
+                    Page <span class="text-white font-medium" x-text="txPage"></span> of <span class="text-white font-medium" x-text="txTotalPages || 1"></span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button @click="prevTxPage()" :disabled="txPage <= 1" class="px-3 py-1 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 disabled:opacity-40 hover:bg-slate-700 transition">Prev</button>
+                    <button @click="nextTxPage()" :disabled="txPage >= txTotalPages" class="px-3 py-1 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 disabled:opacity-40 hover:bg-slate-700 transition">Next</button>
+                </div>
+            </div>
+
+            <button @click="showStockHistoryModal = false" class="w-full bg-slate-700 hover:bg-slate-600 text-white py-2.5 rounded-xl text-sm transition font-medium">Close</button>
+        </div>
+    </div>
+
+    <!-- JavaScript Logic -->
+    <script>
+        function stockFlowApp() {
+            return {
+                products: [],
+                companies: [],
+                productTypes: [],
+                stockTransactions: [],
+                search: '',
+                selectedCompanyId: '',
+                selectedProductTypeId: '',
+                
+                page: 1,
+                pageSize: 10,
+                totalCount: 0,
+                totalPages: 1,
+                sortBy: 'name',
+                sortOrder: 'asc',
+
+                txPage: 1,
+                txPageSize: 10,
+                txTotalCount: 0,
+                txTotalPages: 1,
+                clearBeforeDate: '',
+
+                searchCompanyText: '',
+                searchProductTypeText: '',
+
+                showModal: false,
+                showCompanyModal: false,
+                showProductTypeModal: false,
+                showStockHistoryModal: false,
+                form: {
+                    id: null,
+                    name: '',
+                    stockQuantity: 0,
+                    price: 0.00,
+                    companyId: '',
+                    productTypeId: ''
+                },
+
+                async init() {
+                    await this.loadCompanies();
+                    await this.loadProductTypes();
+                    await this.loadProducts();
+                },
+
+                async loadCompanies() {
+                    try {
+                        let res = await fetch('/api/companies');
+                        if (res.ok) this.companies = await res.json();
+                    } catch (err) {
+                        console.error("Error loading companies:", err);
+                    }
+                },
+
+                async loadProductTypes() {
+                    try {
+                        let res = await fetch('/api/producttypes');
+                        if (res.ok) this.productTypes = await res.json();
+                    } catch (err) {
+                        console.error("Error loading product types:", err);
+                    }
+                },
+
+                async loadStockTransactions() {
+                    try {
+                        let res = await fetch(`/api/stocktransactions?page=${this.txPage}&pageSize=${this.txPageSize}`);
+                        if (res.ok) {
+                            let data = await res.json();
+                            this.stockTransactions = data.transactions;
+                            this.txTotalCount = data.totalCount;
+                            this.txTotalPages = data.totalPages;
+                        }
+                    } catch (err) {
+                        console.error("Error loading stock transactions:", err);
+                    }
+                },
+
+                prevTxPage() {
+                    if (this.txPage > 1) {
+                        this.txPage--;
+                        this.loadStockTransactions();
+                    }
+                },
+
+                nextTxPage() {
+                    if (this.txPage < this.txTotalPages) {
+                        this.txPage++;
+                        this.loadStockTransactions();
+                    }
+                },
+
+                async clearOldTransactions() {
+                    if (!this.clearBeforeDate) {
+                        alert("Please select a date first.");
+                        return;
+                    }
+                    if (!confirm(`Are you sure you want to delete all logs older than ${this.clearBeforeDate}?`)) return;
+
+                    try {
+                        let res = await fetch(`/api/stocktransactions/clear-before?date=${this.clearBeforeDate}`, { method: 'DELETE' });
+                        if (res.ok) {
+                            alert("Old logs cleared successfully.");
+                            this.txPage = 1;
+                            await this.loadStockTransactions();
+                        } else {
+                            alert("Failed to clear logs.");
+                        }
+                    } catch (err) {
+                        console.error("Error clearing logs:", err);
+                    }
+                },
+
+                async loadProducts() {
+                    let url = `/api/products?search=${encodeURIComponent(this.search)}&page=${this.page}&pageSize=${this.pageSize}&sortBy=${this.sortBy}&sortOrder=${this.sortOrder}`;
+                    if (this.selectedCompanyId) url += `&companyId=${this.selectedCompanyId}`;
+                    if (this.selectedProductTypeId) url += `&productTypeId=${this.selectedProductTypeId}`;
+
+                    try {
+                        let res = await fetch(url);
+                        if (res.ok) {
+                            let data = await res.json();
+                            if (data.products !== undefined) {
+                                this.products = data.products;
+                                this.totalCount = data.totalCount;
+                                this.totalPages = data.totalPages;
+                            } else {
+                                this.products = Array.isArray(data) ? data : [];
+                                this.totalCount = this.products.length;
+                                this.totalPages = 1;
+                            }
+                        }
+                    } catch (err) {
+                        console.error("Error loading products:", err);
+                    }
+                },
+
+                sortByColumn(col) {
+                    if (this.sortBy === col) {
+                        this.sortOrder = this.sortOrder === 'asc' ? 'desc' : 'asc';
+                    } else {
+                        this.sortBy = col;
+                        this.sortOrder = 'asc';
+                    }
+                    this.page = 1;
+                    this.loadProducts();
+                },
+
+                prevPage() {
+                    if (this.page > 1) {
+                        this.page--;
+                        this.loadProducts();
+                    }
+                },
+
+                nextPage() {
+                    if (this.page < this.totalPages) {
+                        this.page++;
+                        this.loadProducts();
+                    }
+                },
+
+                exportExcel() {
+                    let url = `/api/products/export-excel?search=${encodeURIComponent(this.search)}`;
+                    if (this.selectedCompanyId) url += `&companyId=${this.selectedCompanyId}`;
+                    if (this.selectedProductTypeId) url += `&productTypeId=${this.selectedProductTypeId}`;
+                    window.location.href = url;
+                },
+
+                openModal() {
+                    this.form = { id: null, name: '', stockQuantity: 0, price: 0.00, companyId: '', productTypeId: '' };
+                    this.showModal = true;
+                },
+
+                openCompanyManager() {
+                    this.searchCompanyText = '';
+                    this.showCompanyModal = true;
+                },
+
+                openProductTypeManager() {
+                    this.searchProductTypeText = '';
+                    this.showProductTypeModal = true;
+                },
+
+                async openStockHistory() {
+                    this.txPage = 1;
+                    await this.loadStockTransactions();
+                    this.showStockHistoryModal = true;
+                },
+
+                async saveProduct() {
+                    try {
+                        let isEdit = this.form.id !== null && this.form.id !== '';
+                        let method = isEdit ? 'PUT' : 'POST';
+                        let url = isEdit ? `/api/products/${this.form.id}` : '/api/products';
+
+                        let payload = {
+                            id: isEdit ? Number(this.form.id) : 0,
+                            name: this.form.name,
+                            stockQuantity: Number(this.form.stockQuantity),
+                            price: Number(this.form.price),
+                            companyId: Number(this.form.companyId),
+                            productTypeId: Number(this.form.productTypeId)
+                        };
+
+                        let res = await fetch(url, {
+                            method: method,
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+
+                        if (res.ok) {
+                            this.showModal = false;
+                            this.form = { id: null, name: '', stockQuantity: 0, price: 0.00, companyId: '', productTypeId: '' };
+                            await this.loadProducts();
+                        } else {
+                            let errText = await res.text();
+                            console.error("Server validation error:", errText);
+                            alert("Failed to save product.");
+                        }
+                    } catch (err) {
+                        console.error("Error saving product:", err);
+                    }
+                },
+
+                editProduct(prod) {
+                    this.form.id = prod.id;
+                    this.form.name = prod.productName || prod.name;
+                    this.form.stockQuantity = prod.stockQuantity || prod.quantity;
+                    this.form.price = prod.price;
+                    
+                    let comp = this.companies.find(c => c.name === (prod.companyName || prod.company?.name));
+                    this.form.companyId = prod.companyId || (comp ? comp.id : '');
+
+                    let type = this.productTypes.find(t => (t.typeName || t.name) === (prod.productTypeName || prod.productType?.name));
+                    this.form.productTypeId = prod.productTypeId || (type ? type.id : '');
+
+                    this.showModal = true;
+                },
+
+                async deleteProduct(id) {
+                    if (!confirm("Are you sure you want to delete this product?")) return;
+                    try {
+                        let res = await fetch(`/api/products/${id}`, { method: 'DELETE' });
+                        if (res.ok) {
+                            await this.loadProducts();
+                        } else {
+                            alert("Failed to delete product.");
+                        }
+                    } catch (err) {
+                        console.error("Error deleting product:", err);
+                    }
+                },
+
+                async quickAddCompany() {
+                    let companyName = prompt("Enter new company name:");
+                    if (!companyName || !companyName.trim()) return;
+
+                    try {
+                        let res = await fetch('/api/companies', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ name: companyName.trim() })
+                        });
+
+                        if (res.ok) {
+                            let addedCompany = await res.json();
+                            await this.loadCompanies();
+                            this.form.companyId = addedCompany.id || addedCompany.company?.id;
+                        } else {
+                            alert("Failed to add company.");
+                        }
+                    } catch (err) {
+                        console.error("Error adding company:", err);
+                    }
+                },
+
+                async quickAddProductType() {
+                    let typeName = prompt("Enter new product type name:");
+                    if (!typeName || !typeName.trim()) return;
+
+                    try {
+                        let res = await fetch('/api/producttypes', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ typeName: typeName.trim() })
+                        });
+
+                        if (res.ok) {
+                            let addedType = await res.json();
+                            await this.loadProductTypes();
+                            this.form.productTypeId = addedType.id || addedType.productType?.id;
+                        } else {
+                            alert("Failed to add product type.");
+                        }
+                    } catch (err) {
+                        console.error("Error adding product type:", err);
+                    }
+                },
+
+                async deleteCompany(id) {
+                    if (!confirm("Warning: Deleting this company will also permanently delete all products associated with it. Are you sure?")) return;
+                    try {
+                        let res = await fetch(`/api/companies/${id}`, { method: 'DELETE' });
+                        if (res.ok) {
+                            await this.loadCompanies();
+                            await this.loadProducts();
+                        } else {
+                            alert("Failed to delete company.");
+                        }
+                    } catch (err) {
+                        console.error("Error deleting company:", err);
+                    }
+                },
+
+                async updateCompany(comp) {
+                    let newName = prompt("Enter new company name:", comp.name);
+                    if (!newName || !newName.trim()) return;
+                    try {
+                        let res = await fetch(`/api/companies/${comp.id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ id: comp.id, name: newName.trim(), contactInfo: comp.contactInfo || "-" })
+                        });
+                        if (res.ok) {
+                            await this.loadCompanies();
+                            await this.loadProducts();
+                        } else {
+                            alert("Failed to update company.");
+                        }
+                    } catch (err) {
+                        console.error("Error updating company:", err);
+                    }
+                },
+
+                async deleteProductType(id) {
+                    if (!confirm("Warning: Deleting this product type will also permanently delete all products associated with it. Are you sure?")) return;
+                    try {
+                        let res = await fetch(`/api/producttypes/${id}`, { method: 'DELETE' });
+                        if (res.ok) {
+                            await this.loadProductTypes();
+                            await this.loadProducts();
+                        } else {
+                            alert("Failed to delete product type.");
+                        }
+                    } catch (err) {
+                        console.error("Error deleting product type:", err);
+                    }
+                },
+
+                async updateProductType(type) {
+                    let currentName = type.typeName || type.name;
+                    let newName = prompt("Enter new product type name:", currentName);
+                    if (!newName || !newName.trim()) return;
+                    try {
+                        let res = await fetch(`/api/producttypes/${type.id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ id: type.id, typeName: newName.trim() })
+                        });
+                        if (res.ok) {
+                            await this.loadProductTypes();
+                            await this.loadProducts();
+                        } else {
+                            alert("Failed to update product type.");
+                        }
+                    } catch (err) {
+                        console.error("Error updating product type:", err);
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>

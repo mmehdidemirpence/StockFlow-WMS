@@ -1,0 +1,39 @@
+{
+  "Version": 1,
+  "Hash": "W36SdMpJU9mZf9YDzb6R6v3LM3uDtIymONg1zpWOtWk=",
+  "Source": "StockFlowAPI2.0",
+  "BasePath": "_content/StockFlowAPI2.0",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [
+    {
+      "Name": "StockFlowAPI2.0\\wwwroot",
+      "Source": "StockFlowAPI2.0",
+      "ContentRoot": "C:\\StockFlowAPI2.0\\wwwroot\\",
+      "BasePath": "_content/StockFlowAPI2.0",
+      "Pattern": "**"
+    }
+  ],
+  "Assets": [
+    {
+      "Identity": "C:\\StockFlowAPI2.0\\wwwroot\\index.html",
+      "SourceId": "StockFlowAPI2.0",
+      "SourceType": "Discovered",
+      "ContentRoot": "C:\\StockFlowAPI2.0\\wwwroot\\",
+      "BasePath": "_content/StockFlowAPI2.0",
+      "RelativePath": "index.html",
+      "AssetKind": "All",
+      "AssetMode": "All",
+      "AssetRole": "Primary",
+      "AssetMergeBehavior": "PreferTarget",
+      "AssetMergeSource": "",
+      "RelatedAsset": "",
+      "AssetTraitName": "",
+      "AssetTraitValue": "",
+      "CopyToOutputDirectory": "Never",
+      "CopyToPublishDirectory": "PreserveNewest",
+      "OriginalItemSpec": "wwwroot\\index.html"
+    }
+  ]
+}
