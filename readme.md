@@ -47,5 +47,5 @@ Follow these steps to set up and run the project locally:
 
 1. **Clone the repository:**
    ```bash
-   git clone [https://github.com/YOUR_USERNAME/StockFlow-WMS.git](https://github.com/mmehdidemirpence/StockFlow-WMS.git)
+   git clone https://github.com/mmehdidemirpence/StockFlow-WMS.git
    cd StockFlow-WMS
